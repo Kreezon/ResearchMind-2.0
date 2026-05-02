@@ -1,8 +1,7 @@
-from langchain.agents import create_agent
+```python
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from tools import web_search, scrape_url
 
 import os
 from dotenv import load_dotenv
@@ -14,84 +13,134 @@ load_dotenv()
 if not os.getenv("GROQ_API_KEY"):
     raise ValueError("GROQ_API_KEY not found.")
 
-if not os.getenv("TAVILY_API_KEY"):
-    raise ValueError("TAVILY_API_KEY not found.")
-
 # ── Groq Model Setup ──
 llm = ChatGroq(
     groq_api_key=os.getenv("GROQ_API_KEY"),
-    model_name="llama-3.3-70b-versatile",
-    temperature=0
+    model_name="llama-3.1-8b-instant",
+    temperature=0,
 )
 
-# ── Agents ──
-def build_search_agent():
-    return create_agent(
-        model=llm,
-        tools=[web_search]
-    )
-
-def build_reader_agent():
-    return create_agent(
-        model=llm,
-        tools=[scrape_url]
-    )
-
-# ── Writer Chain ──
-writer_prompt = ChatPromptTemplate.from_messages([
+# ─────────────────────────────────────────────────────────────
+# SEARCH CHAIN
+# ─────────────────────────────────────────────────────────────
+search_prompt = ChatPromptTemplate.from_messages([
     (
         "system",
-        "You are an expert research writer. Write clear, structured and insightful reports."
+        "You are a professional AI research assistant."
     ),
     (
         "human",
-        """Write a detailed research report on the topic below.
+        """
+Find recent, reliable and detailed information about:
 
 Topic: {topic}
 
-Research Gathered:
+Provide:
+- Latest developments
+- Key trends
+- Important companies/research
+- Technical insights
+- Real-world applications
+
+Be detailed and factual.
+"""
+    ),
+])
+
+search_chain = search_prompt | llm | StrOutputParser()
+
+# ─────────────────────────────────────────────────────────────
+# READER CHAIN
+# ─────────────────────────────────────────────────────────────
+reader_prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        "You are an expert research analyst."
+    ),
+    (
+        "human",
+        """
+Analyze the following research information deeply.
+
+Topic:
+{topic}
+
+Research:
 {research}
 
-Structure the report as:
-- Introduction
-- Key Findings (minimum 3 well-explained points)
-- Conclusion
-- Sources (list all URLs found in the research)
+Extract:
+- Most important insights
+- Technical details
+- Challenges
+- Future outlook
+- Industry impact
 
-Be detailed, factual and professional."""
+Be comprehensive and structured.
+"""
+    ),
+])
+
+reader_chain = reader_prompt | llm | StrOutputParser()
+
+# ─────────────────────────────────────────────────────────────
+# WRITER CHAIN
+# ─────────────────────────────────────────────────────────────
+writer_prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        "You are an expert research writer."
+    ),
+    (
+        "human",
+        """
+Write a detailed professional research report.
+
+Topic:
+{topic}
+
+Research:
+{research}
+
+Structure:
+- Introduction
+- Key Findings
+- Technical Analysis
+- Industry Impact
+- Future Scope
+- Conclusion
+
+Make it detailed and polished.
+"""
     ),
 ])
 
 writer_chain = writer_prompt | llm | StrOutputParser()
 
-# ── Critic Chain ──
+# ─────────────────────────────────────────────────────────────
+# CRITIC CHAIN
+# ─────────────────────────────────────────────────────────────
 critic_prompt = ChatPromptTemplate.from_messages([
     (
         "system",
-        "You are a sharp and constructive research critic. Be honest and specific."
+        "You are a strict research critic."
     ),
     (
         "human",
-        """Review the research report below and evaluate it strictly.
+        """
+Review this report critically.
 
 Report:
 {report}
 
-Respond in this exact format:
-
-Score: X/10
-
-Strengths:
-- ...
-- ...
-
-Areas to Improve:
-- ...
-- ...
-
-One line verdict:
-..."""
+Provide:
+- Overall score out of 10
+- Strengths
+- Weaknesses
+- Improvements
+- Final verdict
+"""
     ),
 ])
 
 critic_chain = critic_prompt | llm | StrOutputParser()
+```
